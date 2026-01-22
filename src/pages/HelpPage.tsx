@@ -91,11 +91,11 @@ const HelpPage = () => {
               <div>
                 <p className="text-sm font-medium">Email Support</p>
                 <a 
-                  href="mailto:support@minihrms.com" 
+                  href="mailto:support@glacier.com" 
                   className="text-sm text-primary hover:underline"
                   data-testid="support-email"
                 >
-                  support@minihrms.com
+                  support@glacier.com
                 </a>
               </div>
               <div>

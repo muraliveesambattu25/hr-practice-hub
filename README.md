@@ -1,4 +1,4 @@
-# MiniHRMS - Selenium Automation Practice App
+# Glacier - Selenium Automation Practice App
 
 A full-stack HRMS application designed specifically for Selenium automation testing practice, featuring realistic UI delays, proper test attributes (`data-testid`), and comprehensive CRUD operations.
 
@@ -11,7 +11,7 @@ The frontend is already running in Lovable with mock API. Use the demo credentia
 ```bash
 # Clone the exported code
 git clone <your-repo-url>
-cd minihrms
+cd glacier
 
 # Start everything
 docker-compose up --build
@@ -31,7 +31,7 @@ docker-compose up --build
 ## 📁 Project Structure
 
 ```
-minihrms/
+glacier/
 ├── frontend/                 # React + TypeScript + Vite
 │   ├── src/
 │   │   ├── components/
@@ -87,9 +87,9 @@ backend/
 
 ```json
 {
-  "name": "minihrms-backend",
+  "name": "glacier-backend",
   "version": "1.0.0",
-  "description": "MiniHRMS Backend API for Selenium Practice",
+  "description": "Glacier Backend API for Selenium Practice",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
@@ -121,9 +121,9 @@ require('dotenv').config();
 
 module.exports = {
   PORT: process.env.PORT || 3001,
-  JWT_SECRET: process.env.JWT_SECRET || 'minihrms-super-secret-key-change-in-production',
+  JWT_SECRET: process.env.JWT_SECRET || 'glacier-super-secret-key-change-in-production',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',
-  DB_PATH: process.env.DB_PATH || './data/minihrms.db',
+  DB_PATH: process.env.DB_PATH || './data/glacier.db',
   CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173',
   // Random delay range for Selenium wait practice (ms)
   MIN_DELAY: 300,
@@ -184,7 +184,7 @@ app.use((req, res) => {
 });
 
 app.listen(config.PORT, () => {
-  console.log(`🚀 MiniHRMS API running on http://localhost:${config.PORT}`);
+  console.log(`🚀 Glacier API running on http://localhost:${config.PORT}`);
 });
 ```
 
@@ -365,9 +365,9 @@ const seedDatabase = async () => {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
-  insertUser.run('admin', hashedAdminPassword, 'Admin', 'System Administrator', 'admin@minihrms.com', 'Active', '2024-01-01');
-  insertUser.run('manager', hashedManagerPassword, 'Manager', 'John Manager', 'manager@minihrms.com', 'Active', '2024-01-15');
-  insertUser.run('employee', hashedEmployeePassword, 'Employee', 'Jane Employee', 'employee@minihrms.com', 'Active', '2024-02-01');
+  insertUser.run('admin', hashedAdminPassword, 'Admin', 'System Administrator', 'admin@glacier.com', 'Active', '2024-01-01');
+  insertUser.run('manager', hashedManagerPassword, 'Manager', 'John Manager', 'manager@glacier.com', 'Active', '2024-01-15');
+  insertUser.run('employee', hashedEmployeePassword, 'Employee', 'Jane Employee', 'employee@glacier.com', 'Active', '2024-02-01');
 
   console.log('✅ Users seeded');
 
@@ -1067,7 +1067,7 @@ CMD ["npm", "start"]
 PORT=3001
 JWT_SECRET=your-super-secret-jwt-key-change-this
 JWT_EXPIRES_IN=24h
-DB_PATH=./data/minihrms.db
+DB_PATH=./data/glacier.db
 CORS_ORIGIN=http://localhost:5173
 ```
 
@@ -1103,8 +1103,8 @@ services:
       - "3001:3001"
     environment:
       - PORT=3001
-      - JWT_SECRET=minihrms-docker-secret-change-in-production
-      - DB_PATH=/app/data/minihrms.db
+      - JWT_SECRET=glacier-docker-secret-change-in-production
+      - DB_PATH=/app/data/glacier.db
       - CORS_ORIGIN=http://localhost:5173
     volumes:
       - backend-data:/app/data
@@ -1158,7 +1158,7 @@ Login and receive JWT token.
     "username": "admin",
     "role": "Admin",
     "fullName": "System Administrator",
-    "email": "admin@minihrms.com",
+    "email": "admin@glacier.com",
     "status": "Active"
   }
 }
