@@ -72,10 +72,10 @@ const Login = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 h-12 w-12 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-xl">HR</span>
+            <span className="text-primary-foreground font-bold text-xl">GL</span>
           </div>
           <CardTitle className="text-2xl" data-testid="login-title">
-            MiniHRMS
+            Glacier
           </CardTitle>
           <CardDescription data-testid="login-subtitle">
             Enter your credentials to access your account

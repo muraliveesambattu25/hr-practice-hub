@@ -15,7 +15,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 // Get stored auth token
 const getAuthToken = (): string | null => {
-  return localStorage.getItem('minihrms_token');
+  return localStorage.getItem('glacier_token');
 };
 
 // Generic fetch wrapper with error handling

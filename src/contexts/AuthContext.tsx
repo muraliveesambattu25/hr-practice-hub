@@ -10,8 +10,8 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const TOKEN_KEY = 'minihrms_token';
-const USER_KEY = 'minihrms_user';
+const TOKEN_KEY = 'glacier_token';
+const USER_KEY = 'glacier_user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AuthState>({

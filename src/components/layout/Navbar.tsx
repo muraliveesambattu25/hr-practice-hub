@@ -57,10 +57,10 @@ export const Navbar = ({ onMenuClick }: NavbarProps) => {
 
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">HR</span>
+            <span className="text-primary-foreground font-bold text-sm">GL</span>
           </div>
           <span className="font-semibold text-lg hidden sm:inline-block" data-testid="app-title">
-            MiniHRMS
+            Glacier
           </span>
         </div>
 
