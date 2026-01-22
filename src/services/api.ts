@@ -6,69 +6,107 @@ import {
   EmployeeFormData,
   EmployeeFilters,
   PaginationParams,
-  PaginatedResponse 
+  PaginatedResponse,
+  ApiError
 } from '@/types';
-import { mockUsers, mockEmployees } from '@/data/mockData';
 
-// Simulate random API delay (300-1200ms) for Selenium wait practice
-const simulateDelay = () => new Promise(resolve => 
-  setTimeout(resolve, Math.random() * 900 + 300)
-);
+// API base URL - uses environment variable or defaults to localhost
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-// Longer delay for login (1-2 seconds)
-const simulateLoginDelay = () => new Promise(resolve => 
-  setTimeout(resolve, Math.random() * 1000 + 1000)
-);
+// Get stored auth token
+const getAuthToken = (): string | null => {
+  return localStorage.getItem('minihrms_token');
+};
 
-// In-memory storage for mock data mutations
-let employees = [...mockEmployees];
-let users = [...mockUsers];
+// Generic fetch wrapper with error handling
+const apiFetch = async <T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> => {
+  const token = getAuthToken();
+  
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  // Handle no content response
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const error: ApiError = {
+      message: data.message || 'An error occurred',
+      errors: data.errors,
+      statusCode: response.status,
+    };
+    throw error;
+  }
+
+  return data;
+};
+
+// Form data fetch for file uploads
+const apiFormFetch = async <T>(
+  endpoint: string,
+  formData: FormData,
+  method: 'POST' | 'PUT' = 'POST'
+): Promise<T> => {
+  const token = getAuthToken();
+  
+  const headers: HeadersInit = {};
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method,
+    headers,
+    body: formData,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const error: ApiError = {
+      message: data.message || 'An error occurred',
+      errors: data.errors,
+      statusCode: response.status,
+    };
+    throw error;
+  }
+
+  return data;
+};
 
 // Auth API
 export const authApi = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    await simulateLoginDelay();
-    
-    const user = mockUsers.find(
-      u => u.username === credentials.username && u.password === credentials.password
-    );
-    
-    if (!user) {
-      throw { message: 'Invalid username or password', statusCode: 401 };
-    }
-    
-    if (user.status === 'Inactive') {
-      throw { message: 'Account is inactive. Please contact administrator.', statusCode: 403 };
-    }
-    
-    const { password, ...userWithoutPassword } = user;
-    const token = btoa(JSON.stringify({ userId: user.id, role: user.role, exp: Date.now() + 86400000 }));
-    
-    return {
-      token,
-      user: userWithoutPassword,
-    };
+    return apiFetch<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
   },
 
-  async getMe(token: string): Promise<User> {
-    await simulateDelay();
-    
-    try {
-      const decoded = JSON.parse(atob(token));
-      if (decoded.exp < Date.now()) {
-        throw { message: 'Token expired', statusCode: 401 };
-      }
-      
-      const user = mockUsers.find(u => u.id === decoded.userId);
-      if (!user) {
-        throw { message: 'User not found', statusCode: 404 };
-      }
-      
-      const { password, ...userWithoutPassword } = user;
-      return userWithoutPassword;
-    } catch {
-      throw { message: 'Invalid token', statusCode: 401 };
+  async getMe(token?: string): Promise<User> {
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
+    return apiFetch<User>('/auth/me', { headers });
   },
 };
 
@@ -78,206 +116,129 @@ export const employeesApi = {
     filters: EmployeeFilters = {},
     pagination: PaginationParams = { page: 1, limit: 10 }
   ): Promise<PaginatedResponse<Employee>> {
-    await simulateDelay();
+    const params = new URLSearchParams();
     
-    let filtered = [...employees];
+    params.append('page', String(pagination.page));
+    params.append('limit', String(pagination.limit));
     
-    // Apply search filter
+    if (pagination.sortBy) {
+      params.append('sortBy', pagination.sortBy);
+    }
+    if (pagination.sortOrder) {
+      params.append('sortOrder', pagination.sortOrder);
+    }
     if (filters.search) {
-      const search = filters.search.toLowerCase();
-      filtered = filtered.filter(emp => 
-        `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(search) ||
-        emp.email.toLowerCase().includes(search)
-      );
+      params.append('search', filters.search);
     }
-    
-    // Apply department filter
     if (filters.department) {
-      filtered = filtered.filter(emp => emp.department === filters.department);
+      params.append('department', filters.department);
     }
-    
-    // Apply status filter
     if (filters.status) {
-      filtered = filtered.filter(emp => emp.status === filters.status);
+      params.append('status', filters.status);
     }
-    
-    // Apply date range filter
     if (filters.joinDateFrom) {
-      filtered = filtered.filter(emp => emp.joinDate >= filters.joinDateFrom!);
+      params.append('joinDateFrom', filters.joinDateFrom);
     }
     if (filters.joinDateTo) {
-      filtered = filtered.filter(emp => emp.joinDate <= filters.joinDateTo!);
+      params.append('joinDateTo', filters.joinDateTo);
     }
-    
-    // Apply sorting
-    if (pagination.sortBy) {
-      filtered.sort((a, b) => {
-        let aVal: string, bVal: string;
-        
-        if (pagination.sortBy === 'fullName') {
-          aVal = `${a.firstName} ${a.lastName}`;
-          bVal = `${b.firstName} ${b.lastName}`;
-        } else {
-          aVal = a.joinDate;
-          bVal = b.joinDate;
-        }
-        
-        const comparison = aVal.localeCompare(bVal);
-        return pagination.sortOrder === 'desc' ? -comparison : comparison;
-      });
-    }
-    
-    const total = filtered.length;
-    const totalPages = Math.ceil(total / pagination.limit);
-    const start = (pagination.page - 1) * pagination.limit;
-    const data = filtered.slice(start, start + pagination.limit);
-    
-    return {
-      data,
-      total,
-      page: pagination.page,
-      limit: pagination.limit,
-      totalPages,
-    };
+
+    return apiFetch<PaginatedResponse<Employee>>(`/employees?${params.toString()}`);
   },
 
   async getById(id: number): Promise<Employee> {
-    await simulateDelay();
-    
-    const employee = employees.find(emp => emp.id === id);
-    if (!employee) {
-      throw { message: 'Employee not found', statusCode: 404 };
-    }
-    
-    return employee;
+    return apiFetch<Employee>(`/employees/${id}`);
   },
 
   async create(data: EmployeeFormData): Promise<Employee> {
-    await simulateDelay();
-    
-    // Check for duplicate email
-    if (employees.some(emp => emp.email.toLowerCase() === data.email.toLowerCase())) {
-      throw { 
-        message: 'Validation failed', 
-        errors: { email: ['Email already exists'] },
-        statusCode: 400 
-      };
+    // If there's a file, use FormData
+    if (data.profilePicture instanceof File) {
+      const formData = new FormData();
+      formData.append('firstName', data.firstName);
+      formData.append('lastName', data.lastName);
+      formData.append('email', data.email);
+      formData.append('mobile', data.mobile);
+      formData.append('department', data.department);
+      formData.append('role', data.role);
+      formData.append('joinDate', data.joinDate);
+      formData.append('salary', String(data.salary));
+      formData.append('address', data.address);
+      formData.append('status', data.status);
+      formData.append('profilePicture', data.profilePicture);
+      
+      return apiFormFetch<Employee>('/employees', formData, 'POST');
     }
-    
-    const newEmployee: Employee = {
-      id: Math.max(...employees.map(e => e.id)) + 1,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      email: data.email,
-      mobile: data.mobile,
-      department: data.department,
-      role: data.role,
-      joinDate: data.joinDate,
-      salary: data.salary,
-      address: data.address,
-      status: data.status,
-      profilePicture: typeof data.profilePicture === 'string' ? data.profilePicture : undefined,
-    };
-    
-    employees.unshift(newEmployee);
-    return newEmployee;
+
+    // Otherwise, use JSON
+    return apiFetch<Employee>('/employees', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   async update(id: number, data: Partial<EmployeeFormData>): Promise<Employee> {
-    await simulateDelay();
-    
-    const index = employees.findIndex(emp => emp.id === id);
-    if (index === -1) {
-      throw { message: 'Employee not found', statusCode: 404 };
+    // If there's a file, use FormData
+    if (data.profilePicture instanceof File) {
+      const formData = new FormData();
+      if (data.firstName) formData.append('firstName', data.firstName);
+      if (data.lastName) formData.append('lastName', data.lastName);
+      if (data.email) formData.append('email', data.email);
+      if (data.mobile !== undefined) formData.append('mobile', data.mobile);
+      if (data.department) formData.append('department', data.department);
+      if (data.role) formData.append('role', data.role);
+      if (data.joinDate) formData.append('joinDate', data.joinDate);
+      if (data.salary !== undefined) formData.append('salary', String(data.salary));
+      if (data.address !== undefined) formData.append('address', data.address);
+      if (data.status) formData.append('status', data.status);
+      formData.append('profilePicture', data.profilePicture);
+      
+      return apiFormFetch<Employee>(`/employees/${id}`, formData, 'PUT');
     }
-    
-    // Check for duplicate email (excluding current employee)
-    if (data.email && employees.some(emp => 
-      emp.id !== id && emp.email.toLowerCase() === data.email!.toLowerCase()
-    )) {
-      throw { 
-        message: 'Validation failed', 
-        errors: { email: ['Email already exists'] },
-        statusCode: 400 
-      };
-    }
-    
-    employees[index] = {
-      ...employees[index],
-      ...data,
-      profilePicture: typeof data.profilePicture === 'string' ? data.profilePicture : employees[index].profilePicture,
-    };
-    
-    return employees[index];
+
+    // Otherwise, use JSON
+    return apiFetch<Employee>(`/employees/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   },
 
   async delete(id: number): Promise<void> {
-    await simulateDelay();
-    
-    const index = employees.findIndex(emp => emp.id === id);
-    if (index === -1) {
-      throw { message: 'Employee not found', statusCode: 404 };
-    }
-    
-    employees.splice(index, 1);
+    return apiFetch<void>(`/employees/${id}`, {
+      method: 'DELETE',
+    });
   },
 };
 
 // Users API (Admin only)
 export const usersApi = {
   async getAll(): Promise<User[]> {
-    await simulateDelay();
-    return users.map(({ password, ...user }) => user);
+    return apiFetch<User[]>('/users');
   },
 
-  async create(data: { username: string; password: string; role: User['role']; fullName: string; email: string }): Promise<User> {
-    await simulateDelay();
-    
-    if (users.some(u => u.username.toLowerCase() === data.username.toLowerCase())) {
-      throw { 
-        message: 'Validation failed', 
-        errors: { username: ['Username already exists'] },
-        statusCode: 400 
-      };
-    }
-    
-    const newUser = {
-      id: Math.max(...users.map(u => u.id)) + 1,
-      username: data.username,
-      password: data.password,
-      role: data.role,
-      fullName: data.fullName,
-      email: data.email,
-      status: 'Active' as const,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    
-    users.push(newUser);
-    const { password, ...userWithoutPassword } = newUser;
-    return userWithoutPassword;
+  async create(data: { 
+    username: string; 
+    password: string; 
+    role: User['role']; 
+    fullName: string; 
+    email: string 
+  }): Promise<User> {
+    return apiFetch<User>('/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   async updateStatus(id: number, status: 'Active' | 'Inactive'): Promise<User> {
-    await simulateDelay();
-    
-    const index = users.findIndex(u => u.id === id);
-    if (index === -1) {
-      throw { message: 'User not found', statusCode: 404 };
-    }
-    
-    users[index].status = status;
-    const { password, ...userWithoutPassword } = users[index];
-    return userWithoutPassword;
+    return apiFetch<User>(`/users/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
   },
 
   async resetPassword(id: number, newPassword: string): Promise<void> {
-    await simulateDelay();
-    
-    const index = users.findIndex(u => u.id === id);
-    if (index === -1) {
-      throw { message: 'User not found', statusCode: 404 };
-    }
-    
-    users[index].password = newPassword;
+    return apiFetch<void>(`/users/${id}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ newPassword }),
+    });
   },
 };
