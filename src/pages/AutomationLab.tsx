@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { format } from 'date-fns';
 import { 
   CheckSquare, 
   Circle, 
@@ -9,15 +10,24 @@ import {
   AlertTriangle,
   X,
   ExternalLink,
-  Loader2
+  Loader2,
+  Calendar as CalendarIcon,
+  SlidersHorizontal,
+  Table as TableIcon,
+  ScrollText,
+  Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Calendar } from '@/components/ui/calendar';
+import { Slider } from '@/components/ui/slider';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -38,6 +48,40 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { cn } from '@/lib/utils';
+
+// Sample data for autocomplete
+const countries = [
+  'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany',
+  'France', 'Japan', 'China', 'India', 'Brazil', 'Mexico', 'Spain',
+  'Italy', 'Netherlands', 'Sweden', 'Norway', 'Denmark', 'Finland',
+  'Switzerland', 'Austria', 'Belgium', 'Portugal', 'Ireland', 'Poland'
+];
+
+// Sample table data
+const tableData = [
+  { id: 1, name: 'John Doe', email: 'john@example.com', status: 'Active' },
+  { id: 2, name: 'Jane Smith', email: 'jane@example.com', status: 'Inactive' },
+  { id: 3, name: 'Bob Johnson', email: 'bob@example.com', status: 'Active' },
+  { id: 4, name: 'Alice Brown', email: 'alice@example.com', status: 'Active' },
+  { id: 5, name: 'Charlie Wilson', email: 'charlie@example.com', status: 'Inactive' },
+];
 
 const AutomationLab = () => {
   // Checkbox state
@@ -71,6 +115,32 @@ const AutomationLab = () => {
   const [items, setItems] = useState(['Item 1', 'Item 2', 'Item 3']);
   const [droppedItems, setDroppedItems] = useState<string[]>([]);
   const dragItem = useRef<number | null>(null);
+
+  // Date picker state
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
+  });
+
+  // Slider states
+  const [singleSlider, setSingleSlider] = useState([50]);
+  const [rangeSlider, setRangeSlider] = useState([25, 75]);
+
+  // Table selection state
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
+
+  // Infinite scroll state
+  const [infiniteItems, setInfiniteItems] = useState<string[]>(
+    Array.from({ length: 20 }, (_, i) => `Item ${i + 1}`)
+  );
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Autocomplete state
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
+  const [autocompleteValue, setAutocompleteValue] = useState('');
+  const [autocompleteInput, setAutocompleteInput] = useState('');
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -138,6 +208,55 @@ const AutomationLab = () => {
         : [...prev, value]
     );
   };
+
+  // Table row selection handlers
+  const toggleRowSelection = (id: number) => {
+    setSelectedRows(prev =>
+      prev.includes(id)
+        ? prev.filter(rowId => rowId !== id)
+        : [...prev, id]
+    );
+  };
+
+  const toggleAllRows = () => {
+    if (selectedRows.length === tableData.length) {
+      setSelectedRows([]);
+    } else {
+      setSelectedRows(tableData.map(row => row.id));
+    }
+  };
+
+  // Infinite scroll handler
+  const handleScroll = useCallback(() => {
+    if (!scrollRef.current || isLoadingMore) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    
+    if (scrollTop + clientHeight >= scrollHeight - 10) {
+      setIsLoadingMore(true);
+      
+      setTimeout(() => {
+        setInfiniteItems(prev => [
+          ...prev,
+          ...Array.from({ length: 10 }, (_, i) => `Item ${prev.length + i + 1}`)
+        ]);
+        setIsLoadingMore(false);
+      }, 1000);
+    }
+  }, [isLoadingMore]);
+
+  useEffect(() => {
+    const scrollElement = scrollRef.current;
+    if (scrollElement) {
+      scrollElement.addEventListener('scroll', handleScroll);
+      return () => scrollElement.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
+
+  // Filter countries for autocomplete
+  const filteredCountries = countries.filter(country =>
+    country.toLowerCase().includes(autocompleteInput.toLowerCase())
+  );
 
   return (
     <div className="space-y-6" data-testid="automation-lab-page">
@@ -211,7 +330,7 @@ const AutomationLab = () => {
                 <SelectTrigger data-testid="single-select">
                   <SelectValue placeholder="Select option" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-popover">
                   <SelectItem value="option1">Option 1</SelectItem>
                   <SelectItem value="option2">Option 2</SelectItem>
                   <SelectItem value="option3">Option 3</SelectItem>
@@ -233,6 +352,185 @@ const AutomationLab = () => {
                   </Button>
                 ))}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Date Picker */}
+        <Card data-testid="datepicker-section">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5" />
+              Date Picker
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Single Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                    data-testid="single-date-picker"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 bg-popover" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    className="pointer-events-auto"
+                    data-testid="calendar-single"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Date Range</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !dateRange.from && "text-muted-foreground"
+                    )}
+                    data-testid="date-range-picker"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.from ? (
+                      dateRange.to ? (
+                        `${format(dateRange.from, "MMM d")} - ${format(dateRange.to, "MMM d")}`
+                      ) : (
+                        format(dateRange.from, "PPP")
+                      )
+                    ) : (
+                      "Pick date range"
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 bg-popover" align="start">
+                  <Calendar
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
+                    numberOfMonths={2}
+                    className="pointer-events-auto"
+                    data-testid="calendar-range"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Sliders */}
+        <Card data-testid="slider-section">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <SlidersHorizontal className="h-5 w-5" />
+              Sliders
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <Label>Single Value</Label>
+                <span className="text-sm text-muted-foreground" data-testid="single-slider-value">
+                  {singleSlider[0]}
+                </span>
+              </div>
+              <Slider
+                value={singleSlider}
+                onValueChange={setSingleSlider}
+                max={100}
+                step={1}
+                data-testid="single-slider"
+              />
+            </div>
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <Label>Range</Label>
+                <span className="text-sm text-muted-foreground" data-testid="range-slider-value">
+                  {rangeSlider[0]} - {rangeSlider[1]}
+                </span>
+              </div>
+              <Slider
+                value={rangeSlider}
+                onValueChange={setRangeSlider}
+                max={100}
+                step={1}
+                data-testid="range-slider"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Autocomplete */}
+        <Card data-testid="autocomplete-section">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Autocomplete
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Label>Search Country</Label>
+              <Popover open={autocompleteOpen} onOpenChange={setAutocompleteOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={autocompleteOpen}
+                    className="w-full justify-between"
+                    data-testid="autocomplete-trigger"
+                  >
+                    {autocompleteValue || "Select country..."}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0 bg-popover" align="start">
+                  <Command data-testid="autocomplete-command">
+                    <CommandInput 
+                      placeholder="Search country..." 
+                      value={autocompleteInput}
+                      onValueChange={setAutocompleteInput}
+                      data-testid="autocomplete-input"
+                    />
+                    <CommandList>
+                      <CommandEmpty data-testid="autocomplete-empty">No country found.</CommandEmpty>
+                      <CommandGroup>
+                        {filteredCountries.slice(0, 8).map((country) => (
+                          <CommandItem
+                            key={country}
+                            value={country}
+                            onSelect={(value) => {
+                              setAutocompleteValue(value);
+                              setAutocompleteOpen(false);
+                            }}
+                            data-testid={`autocomplete-item-${country.toLowerCase().replace(/\s/g, '-')}`}
+                          >
+                            {country}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {autocompleteValue && (
+                <p className="text-sm text-muted-foreground" data-testid="autocomplete-selected">
+                  Selected: {autocompleteValue}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -432,6 +730,96 @@ const AutomationLab = () => {
                 {dynamicContent}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Table with Row Selection */}
+        <Card className="md:col-span-2" data-testid="table-selection-section">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TableIcon className="h-5 w-5" />
+              Table with Row Selection
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table data-testid="selectable-table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedRows.length === tableData.length}
+                      onCheckedChange={toggleAllRows}
+                      data-testid="select-all-rows"
+                    />
+                  </TableHead>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tableData.map((row) => (
+                  <TableRow 
+                    key={row.id}
+                    className={cn(selectedRows.includes(row.id) && "bg-muted")}
+                    data-testid={`table-row-${row.id}`}
+                  >
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedRows.includes(row.id)}
+                        onCheckedChange={() => toggleRowSelection(row.id)}
+                        data-testid={`select-row-${row.id}`}
+                      />
+                    </TableCell>
+                    <TableCell data-testid={`row-${row.id}-id`}>{row.id}</TableCell>
+                    <TableCell data-testid={`row-${row.id}-name`}>{row.name}</TableCell>
+                    <TableCell data-testid={`row-${row.id}-email`}>{row.email}</TableCell>
+                    <TableCell data-testid={`row-${row.id}-status`}>{row.status}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <p className="mt-4 text-sm text-muted-foreground" data-testid="selected-count">
+              {selectedRows.length} of {tableData.length} row(s) selected
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Infinite Scroll */}
+        <Card data-testid="infinite-scroll-section">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ScrollText className="h-5 w-5" />
+              Infinite Scroll
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              ref={scrollRef}
+              className="h-64 overflow-y-auto border rounded-lg"
+              data-testid="infinite-scroll-container"
+            >
+              <div className="p-2 space-y-2">
+                {infiniteItems.map((item, index) => (
+                  <div
+                    key={index}
+                    className="p-3 bg-muted rounded-lg"
+                    data-testid={`infinite-item-${index}`}
+                  >
+                    {item}
+                  </div>
+                ))}
+                {isLoadingMore && (
+                  <div className="flex items-center justify-center p-4" data-testid="infinite-loading">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground" data-testid="infinite-count">
+              Loaded {infiniteItems.length} items
+            </p>
           </CardContent>
         </Card>
 
